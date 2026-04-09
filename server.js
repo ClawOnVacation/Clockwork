@@ -56,12 +56,26 @@ setInterval(() => {
   if (timerState.state === 'running') pushToSheets('running', elapsed());
 }, 5000);
 
-// ── Timer state (authoritative, server-side) ──────────────────
-let timerState = {
-  state:     'stopped',  // 'running' | 'paused' | 'stopped'
-  startTime: null,       // epoch ms, adjusted for resume
-  pausedMs:  0,          // ms elapsed at pause
-};
+// ── Timer state — persisted to disk so restarts don't lose the count ──
+const STATE_FILE = path.join(__dirname, 'timer-state.json');
+
+function loadState() {
+  try {
+    const raw = require('fs').readFileSync(STATE_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch(e) {
+    return { state: 'stopped', startTime: null, pausedMs: 0 };
+  }
+}
+
+function saveState() {
+  try {
+    require('fs').writeFileSync(STATE_FILE, JSON.stringify(timerState));
+  } catch(e) {}
+}
+
+let timerState = loadState();
+console.log('[timer] Loaded state:', timerState.state, timerState.startTime ? `started at ${new Date(timerState.startTime).toISOString()}` : '');
 
 function elapsed() {
   if (timerState.state === 'running')  return Date.now() - timerState.startTime;
@@ -122,9 +136,20 @@ wss.on('connection', (ws) => {
       serverNow: Date.now(),
     };
     broadcast(syncMsg);
+    saveState();
     pushToSheets(timerState.state, elapsed());
   });
 });
+
+// ── Self-ping every 10 min to keep Render free tier alive ────
+function selfPing() {
+  const host = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  const url = new URL('/api/elapsed', host);
+  const lib = url.protocol === 'https:' ? require('https') : require('http');
+  lib.get(url.toString(), { headers: { 'User-Agent': 'clockwork-keepalive' } }, () => {})
+    .on('error', () => {});
+}
+setInterval(selfPing, 10 * 60 * 1000);
 
 server.listen(PORT, () => {
   console.log(`Clockwork running at http://localhost:${PORT}`);
