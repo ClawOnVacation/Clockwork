@@ -29,12 +29,15 @@
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
     .role-tag { position: fixed; top: 20px; right: 24px; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.2); }
+    .mode-toggle { position: fixed; top: 16px; left: 24px; background: none; border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.4); font-family: inherit; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; padding: 7px 16px; cursor: pointer; border-radius: 2px; transition: border-color 0.15s, color 0.15s; }
+    .mode-toggle:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
     .viewer-link { position: fixed; bottom: 24px; font-size: 11px; letter-spacing: 0.1em; color: rgba(255,255,255,0.2); text-decoration: none; }
     .viewer-link:hover { color: rgba(255,255,255,0.5); }
   </style>
 </head>
 <body>
   <div class="role-tag">Operator</div>
+  <button class="mode-toggle" onclick="window.location.href='/viewer'">Switch to Viewer</button>
 
   <div class="container">
     <div class="timer">
