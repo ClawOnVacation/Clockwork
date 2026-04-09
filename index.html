@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clockwork</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      background: #000;
+      color: #fff;
+      font-family: 'Neue Haas Grotesk Display Pro', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 64px;
+    }
+
+    .timer {
+      display: flex;
+      align-items: baseline;
+      font-size: clamp(72px, 14vw, 160px);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .timer-unit { min-width: 2ch; text-align: center; }
+
+    .timer-dot {
+      opacity: 0.35;
+      padding: 0 0.04em;
+      font-size: 0.7em;
+      align-self: center;
+    }
+
+    .controls-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .controls { display: flex; gap: 16px; }
+
+    .btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 12px 32px;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.5); }
+    .btn.active { border-color: #fff; background: rgba(255,255,255,0.1); }
+    .btn:disabled { opacity: 0.25; cursor: default; background: none; }
+
+    #ms-display {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      color: rgba(255,255,255,0.25);
+      font-family: inherit;
+    }
+
+    .status {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #333; transition: background 0.3s;
+    }
+    .status.running { background: #fff; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="timer">
+      <span class="timer-unit" id="days">00</span>
+      <span class="timer-dot">.</span>
+      <span class="timer-unit" id="hours">00</span>
+      <span class="timer-dot">.</span>
+      <span class="timer-unit" id="minutes">00</span>
+    </div>
+
+    <div class="controls-wrap">
+      <div class="controls">
+        <button class="btn" id="btn-start">Start</button>
+        <button class="btn" id="btn-pause">Pause</button>
+        <button class="btn" id="btn-reset">Reset</button>
+      </div>
+      <span id="sub-display" style="font-size:11px;letter-spacing:0.14em;color:rgba(255,255,255,0.25);font-family:inherit;">00s &nbsp; 000ms</span>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    let state    = 'stopped';
+    let startTime = null;
+    let pausedMs  = 0;
+    let raf       = null;
+
+    const daysEl   = document.getElementById('days');
+    const hoursEl  = document.getElementById('hours');
+    const minsEl   = document.getElementById('minutes');
+    const msEl     = document.getElementById('sub-display');
+    const statusEl = document.getElementById('status');
+    const btnStart = document.getElementById('btn-start');
+    const btnPause = document.getElementById('btn-pause');
+    const btnReset = document.getElementById('btn-reset');
+
+    function pad(n) { return String(Math.min(n, 99)).padStart(2, '0'); }
+
+    function render(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      const totalMin = Math.floor(totalSec / 60);
+      const totalHrs = Math.floor(totalMin / 60);
+      daysEl.textContent  = pad(Math.floor(totalHrs / 24));
+      hoursEl.textContent = pad(totalHrs % 24);
+      minsEl.textContent  = pad(totalMin % 60);
+      const secs = String(totalSec % 60).padStart(2, '0');
+      const millis = String(ms % 1000).padStart(3, '0');
+      msEl.textContent = secs + 's   ' + millis + 'ms';
+    }
+
+    function tick() {
+      if (state !== 'running') return;
+      render(Date.now() - startTime);
+      raf = requestAnimationFrame(tick);
+    }
+
+    function updateButtons() {
+      btnStart.classList.toggle('active', state === 'running');
+      btnPause.classList.toggle('active', state === 'paused');
+      statusEl.classList.toggle('running', state === 'running');
+      btnStart.disabled = state === 'running';
+      btnPause.disabled = state === 'stopped';
+    }
+
+    btnStart.addEventListener('click', () => {
+      if (state === 'running') return;
+      startTime = state === 'paused' ? Date.now() - pausedMs : Date.now();
+      pausedMs  = 0;
+      state     = 'running';
+      updateButtons();
+      tick();
+    });
+
+    btnPause.addEventListener('click', () => {
+      if (state !== 'running') return;
+      pausedMs = Date.now() - startTime;
+      state    = 'paused';
+      cancelAnimationFrame(raf);
+      render(pausedMs);
+      updateButtons();
+    });
+
+    btnReset.addEventListener('click', () => {
+      state = 'stopped'; startTime = null; pausedMs = 0;
+      cancelAnimationFrame(raf);
+      render(0);
+      updateButtons();
+    });
+
+    render(0);
+    updateButtons();
+  </script>
+</body>
+</html>

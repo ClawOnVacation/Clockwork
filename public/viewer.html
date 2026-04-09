@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clockwork — Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; background: #000; color: #fff; font-family: 'Neue Haas Grotesk Display Pro', 'Helvetica Neue', Arial, sans-serif; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+
+    .timer { display: flex; align-items: baseline; font-size: clamp(80px, 18vw, 220px); font-weight: 500; letter-spacing: -0.02em; line-height: 1; user-select: none; }
+    .timer-unit { min-width: 2ch; text-align: center; }
+    .timer-dot { opacity: 0.3; padding: 0 0.04em; font-size: 0.7em; align-self: center; }
+
+    .status { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; background: #222; transition: background 0.3s; }
+    .status.running { background: #fff; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .role-tag { position: fixed; top: 20px; right: 24px; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.15); }
+  </style>
+</head>
+<body>
+  <div class="role-tag">Viewer</div>
+
+  <div class="timer">
+    <span class="timer-unit" id="days">00</span>
+    <span class="timer-dot">.</span>
+    <span class="timer-unit" id="hours">00</span>
+    <span class="timer-dot">.</span>
+    <span class="timer-unit" id="minutes">00</span>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script>
+    const daysEl   = document.getElementById('days');
+    const hoursEl  = document.getElementById('hours');
+    const minsEl   = document.getElementById('minutes');
+    const statusEl = document.getElementById('status');
+
+    let state = 'stopped', startTime = null, pausedMs = 0, clockDiff = 0, raf = null;
+
+    function pad(n) { return String(Math.min(n, 99)).padStart(2, '0'); }
+
+    function render(ms) {
+      ms = Math.max(0, ms);
+      const totalSec = Math.floor(ms / 1000);
+      const totalMin = Math.floor(totalSec / 60);
+      const totalHrs = Math.floor(totalMin / 60);
+      daysEl.textContent  = pad(Math.floor(totalHrs / 24));
+      hoursEl.textContent = pad(totalHrs % 24);
+      minsEl.textContent  = pad(totalMin % 60);
+    }
+
+    function elapsed() {
+      if (state === 'running') return (Date.now() + clockDiff) - startTime;
+      if (state === 'paused')  return pausedMs;
+      return 0;
+    }
+
+    function tick() {
+      render(elapsed());
+      if (state === 'running') raf = requestAnimationFrame(tick);
+    }
+
+    function applySync(msg) {
+      clockDiff = msg.serverNow - Date.now();
+      state     = msg.state;
+      startTime = msg.startTime;
+      pausedMs  = msg.pausedMs;
+      cancelAnimationFrame(raf);
+      statusEl.classList.toggle('running', state === 'running');
+      render(elapsed());
+      if (state === 'running') tick();
+    }
+
+    const ws = new WebSocket(`ws://${location.host}`);
+    ws.onmessage = (e) => { const msg = JSON.parse(e.data); if (msg.type === 'sync') applySync(msg); };
+    ws.onclose   = () => { setTimeout(() => location.reload(), 2000); };
+
+    render(0);
+  </script>
+</body>
+</html>
